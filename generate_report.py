@@ -1,434 +1,145 @@
-
-from pathlib import Path
-from datetime import datetime
-
+﻿from pathlib import Path
 import pandas as pd
-
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table,
-    TableStyle, Image, PageBreak
-)
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 
-ROOT = Path(__file__).resolve().parent
-REPORTS = ROOT / "reports"
-CHARTS = REPORTS / "charts"
+R = Path("reports")
+C = R / "charts"
+m = pd.read_csv(R / "final_model_metrics.csv")
+cv = pd.read_csv(R / "cross_validation_model_comparison.csv")
+cl = pd.read_csv(R / "classification_report.csv", index_col=0)
+er = pd.read_csv(R / "class_error_analysis.csv")
+cf = pd.read_csv(R / "most_common_class_confusions.csv")
+pi = pd.read_csv(R / "permutation_importance.csv")
+v = dict(zip(m["Metric"], m["Score"]))
 
-output_file = REPORTS / "Forest_Cover_Prediction_Final_Report.pdf"
+s = getSampleStyleSheet()
+s.add(ParagraphStyle(name="Body", parent=s["BodyText"], fontSize=9, leading=13, spaceAfter=7))
+story = []
 
-# Read actual project results
-metrics = pd.read_csv(REPORTS / "model_metrics.csv")
-comparison = pd.read_csv(REPORTS / "model_comparison.csv")
-classification = pd.read_csv(
-    REPORTS / "classification_report.csv", index_col=0
-)
-features = pd.read_csv(REPORTS / "feature_importance.csv")
+def p(x, style="Body"):
+    story.append(Paragraph(str(x), s[style]))
 
-styles = getSampleStyleSheet()
+def h(x):
+    p(x, "Heading1")
 
-styles.add(ParagraphStyle(
-    name="CoverTitle",
-    parent=styles["Title"],
-    fontSize=24,
-    leading=30,
-    alignment=TA_CENTER,
-    textColor=colors.HexColor("#17365D"),
-    spaceAfter=18
-))
+def t(rows, widths=None):
+    q = Table(rows, colWidths=widths, repeatRows=1)
+    q.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#243B53")),
+        ("TEXTCOLOR",(0,0),(-1,0),colors.white),
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+        ("FONTSIZE",(0,0),(-1,-1),8),
+        ("GRID",(0,0),(-1,-1),0.4,colors.grey),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#EEF2F6")]),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("TOPPADDING",(0,0),(-1,-1),5),
+        ("BOTTOMPADDING",(0,0),(-1,-1),5)
+    ]))
+    story.extend([q, Spacer(1,10)])
 
-styles.add(ParagraphStyle(
-    name="SectionHeading",
-    parent=styles["Heading2"],
-    fontSize=14,
-    textColor=colors.HexColor("#17365D"),
-    spaceBefore=12,
-    spaceAfter=8
-))
+def img(name):
+    f = C / name
+    if f.exists():
+        q = Image(str(f))
+        q.drawWidth = 16*cm
+        q.drawHeight = q.drawWidth*q.imageHeight/q.imageWidth
+        q.hAlign = "CENTER"
+        story.extend([q, Spacer(1,8)])
 
-styles.add(ParagraphStyle(
-    name="BodyTextCustom",
-    parent=styles["BodyText"],
-    fontSize=9,
-    leading=14,
-    spaceAfter=8
-))
+p("FOREST COVER TYPE PREDICTION", "Title")
+p("Machine Learning Classification Project | PRCP-1005", "Heading2")
+p("Final model: Tuned Extra Trees")
+p(f"Holdout accuracy: {v['Accuracy']:.2%} | Macro F1: {v['Macro F1']:.2%}")
+story.append(PageBreak())
+
+h("1. Executive Summary")
+p("This project predicts seven forest cover types from cartographic and environmental measurements. The dataset contains 15,120 records and 56 original columns. After removing the identifier and two constant columns, 52 predictors were retained.")
+t([["Evaluation metric","Result"],
+   ["Accuracy",f"{v['Accuracy']:.2%}"],
+   ["Macro F1",f"{v['Macro F1']:.2%}"],
+   ["Weighted F1",f"{v['Weighted F1']:.2%}"],
+   ["Balanced accuracy",f"{v['Balanced Accuracy']:.2%}"]])
+
+h("2. Dataset and Data Quality")
+p("The dataset has seven equally represented target classes, with 2,160 records per class. The audit found no missing values and no duplicate rows. Soil_Type7 and Soil_Type15 were constant zero columns and were removed. Id was excluded because it is an identifier.")
+img("01_target_distribution.png")
+
+h("3. Preprocessing Decisions")
+p("No imputation was required because there were no missing values. Soil and wilderness variables were already represented by binary indicators, so additional one-hot encoding was unnecessary. Scaling was not applied because the candidate algorithms were tree-based. A scikit-learn Pipeline was used for model fitting.")
+img("02_indicator_frequency.png")
+
+h("4. Exploratory Data Analysis")
+p("EDA covered numerical feature distributions, descriptive statistics, skewness, IQR-based potential outliers, correlations, class-level median profiles and elevation differences across cover types.")
+for f in ["03_numeric_feature_distributions.png","04_continuous_feature_correlation.png","05_feature_target_median_heatmap.png","06_elevation_by_cover_type.png"]:
+    img(f)
+p("Potential outliers were flagged using the 1.5 × IQR rule and retained because environmental extremes may be valid observations. Correlation does not establish causation.")
+
+h("5. Model Comparison and Validation")
+p("Decision Tree, Random Forest, Extra Trees and Hist Gradient Boosting were compared using repeated stratified three-fold cross-validation with two repeats. The reported standard deviations describe variation across six folds, not confidence intervals.")
+rows = [["Model","Accuracy mean","Macro F1 mean","Macro F1 SD"]]
+for _,r in cv.iterrows():
+    rows.append([r["Model"],f"{r['accuracy mean']:.2%}",f"{r['macro_f1 mean']:.2%}",f"{r['macro_f1 std']:.4f}"])
+t(rows)
+best = cv.sort_values("macro_f1 mean",ascending=False).iloc[0]
+p(f"Extra Trees was the strongest default candidate by mean CV macro F1: {best['macro_f1 mean']:.2%} (SD {best['macro_f1 std']:.4f}). A DummyClassifier baseline was also evaluated in the notebook.")
+img("07_cross_validation_comparison.png")
+
+h("6. Hyperparameter Tuning")
+p("Extra Trees was tuned using RandomizedSearchCV, three-fold stratified cross-validation and macro F1 as the selection metric. Tuning was performed on the training portion of a stratified 80:20 split. Search results are saved in reports/extra_trees_tuning_results.csv.")
+
+h("7. Holdout Results")
+p("The holdout contains 3,024 records, with 432 records per class.")
+rows = [["Class","Precision","Recall","F1","Support"]]
+for label in ["1","2","3","4","5","6","7"]:
+    if label in cl.index:
+        r=cl.loc[label]
+        rows.append([label,f"{r['precision']:.2%}",f"{r['recall']:.2%}",f"{r['f1-score']:.2%}",int(r["support"])])
+t(rows)
+img("08_confusion_matrix.png")
+
+h("8. Error Analysis")
+weak = er.sort_values("Recall").iloc[0]
+strong = er.sort_values("Recall",ascending=False).iloc[0]
+p(f"Class {int(weak['Cover Type'])} had the lowest recall ({weak['Recall']:.2%}); class {int(strong['Cover Type'])} had the highest ({strong['Recall']:.2%}).")
+rows=[["Actual class","Predicted class","Errors"]]
+for _,r in cf.head(8).iterrows():
+    rows.append([int(r["Actual class"]),int(r["Predicted class"]),int(r["Misclassified records"])])
+t(rows)
+
+h("9. Feature Interpretation")
+p("Impurity-based importance and permutation importance were calculated. Permutation importance used macro F1 on the holdout. These measures describe model behaviour, not causal effects.")
+img("09_impurity_feature_importance.png")
+img("10_permutation_importance.png")
+rows=[["Feature","Permutation importance","SD"]]
+for _,r in pi.head(10).iterrows():
+    rows.append([r["Feature"],f"{r['Permutation importance mean']:.5f}",f"{r['Permutation importance std']:.5f}"])
+t(rows)
+
+h("10. Limitations")
+for x in [
+"The dataset was used in earlier project iterations; the revised holdout is not historically untouched.",
+"Cross-validation and holdout results are internal estimates, not external geographic validation.",
+"The dataset may not represent all forest regions or data collection conditions.",
+"Class 2 has the lowest recall and needs further investigation.",
+"Feature importance does not establish causation."
+]:
+    p("• "+x)
+
+h("11. Conclusion and Future Work")
+p(f"The tuned Extra Trees model achieved {v['Accuracy']:.2%} holdout accuracy and {v['Macro F1']:.2%} macro F1. Repeated cross-validation also selected Extra Trees as the strongest default candidate. Future work should evaluate an independently collected dataset, investigate frequent class confusions and assess geographic generalisation.")
 
 def footer(canvas, doc):
     canvas.saveState()
-    canvas.setFont("Helvetica", 8)
-    canvas.setFillColor(colors.grey)
-    canvas.drawString(
-        0.65 * inch, 0.4 * inch,
-        "Forest Cover Prediction | PRCP-1005"
-    )
-    canvas.drawRightString(
-        7.85 * inch, 0.4 * inch,
-        f"Page {doc.page}"
-    )
+    canvas.setFont("Helvetica",8)
+    canvas.drawString(1.7*cm,1.0*cm,"Forest Cover Prediction | PRCP-1005")
+    canvas.drawRightString(A4[0]-1.7*cm,1.0*cm,f"Page {doc.page}")
     canvas.restoreState()
 
-def make_table(data, widths=None):
-    table = Table(data, colWidths=widths, repeatRows=1)
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17365D")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-         [colors.white, colors.HexColor("#EAF0F6")]),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    return table
-
-def add_paragraph(story, text):
-    story.append(Paragraph(text, styles["BodyTextCustom"]))
-
-def add_chart(story, filename, width=6.2 * inch, max_height=5.5 * inch):
-    chart_path = CHARTS / filename
-
-    if chart_path.exists():
-        chart = Image(str(chart_path))
-        scale = min(
-            width / chart.imageWidth,
-            max_height / chart.imageHeight
-        )
-
-        chart.drawWidth = chart.imageWidth * scale
-        chart.drawHeight = chart.imageHeight * scale
-
-        story.append(chart)
-        story.append(Spacer(1, 8))
-    else:
-        add_paragraph(story, f"Chart not found: {filename}")
-
-story = []
-
-# Cover page
-story.append(Spacer(1, 1.2 * inch))
-story.append(Paragraph(
-    "FOREST COVER<br/>TYPE PREDICTION",
-    styles["CoverTitle"]
-))
-story.append(Paragraph(
-    "Machine Learning Classification Project",
-    styles["Heading2"]
-))
-story.append(Spacer(1, 0.3 * inch))
-story.append(Paragraph(
-    "<b>Project Code:</b> PRCP-1005",
-    styles["BodyTextCustom"]
-))
-story.append(Paragraph(
-    "<b>Prepared for:</b> DataMites Capstone Project",
-    styles["BodyTextCustom"]
-))
-story.append(Paragraph(
-    f"<b>Report date:</b> {datetime.now().strftime('%d %B %Y')}",
-    styles["BodyTextCustom"]
-))
-story.append(Spacer(1, 0.4 * inch))
-add_paragraph(
-    story,
-    "This project develops a machine learning classification model "
-    "to predict forest cover types using environmental and "
-    "cartographic features."
-)
-story.append(PageBreak())
-
-# 1. Overview
-story.append(Paragraph("1. Project Overview", styles["SectionHeading"]))
-add_paragraph(
-    story,
-    "The objective is to predict one of seven forest cover types "
-    "from environmental measurements, wilderness-area indicators "
-    "and soil-type indicators."
-)
-add_paragraph(
-    story,
-    "The project uses a dataset containing 15,120 records and "
-    "56 columns, including the identifier and target column. "
-    "After removing the identifier and two constant features, "
-    "52 predictor features were used for modelling."
-)
-
-# 2. Data preparation
-story.append(Paragraph("2. Data Preparation", styles["SectionHeading"]))
-add_paragraph(
-    story,
-    "The dataset was checked for missing values, duplicate records, "
-    "constant columns and one-hot encoded wilderness and soil features. "
-    "The Id column and two constant soil columns were excluded from "
-    "model training. The target variable was Cover_Type."
-)
-add_paragraph(
-    story,
-    "The data was divided into training and testing subsets using "
-    "an 80:20 stratified split with random_state=42."
-)
-
-# 3. Exploratory Data Analysis
-
-story.append(Paragraph(
-    "3. Exploratory Data Analysis",
-    styles["SectionHeading"]
-))
-
-add_paragraph(
-    story,
-    "Exploratory Data Analysis (EDA) was performed to understand "
-    "the distribution of forest cover types and the relationships "
-    "between environmental features. The analysis included target "
-    "class distribution, feature correlation, elevation distribution "
-    "and elevation differences across forest cover types."
-)
-
-add_chart(story, "cover_type_distribution.png")
-
-add_paragraph(
-    story,
-    "The dataset contains seven forest cover classes, with 2,160 "
-    "records in each class. This balanced distribution provides "
-    "equal representation of all target classes."
-)
-
-add_chart(story, "feature_correlation_heatmap.png")
-
-add_paragraph(
-    story,
-    "The correlation heatmap was used to examine relationships "
-    "between the ten continuous environmental features. Correlation "
-    "indicates the strength and direction of linear relationships; "
-    "it does not establish causation."
-)
-
-add_chart(story, "elevation_distribution.png")
-
-add_paragraph(
-    story,
-    "Elevation distribution was examined to understand the range "
-    "and frequency of elevation values across the dataset."
-)
-
-add_chart(story, "elevation_by_cover_type.png")
-
-add_paragraph(
-    story,
-    "The elevation box plot compares elevation values across the "
-    "seven forest cover types. It helps identify differences in "
-    "elevation ranges and the spread of observations for each class."
-)
-
-# 4. Model Comparison
-story.append(Paragraph("4. Model Comparison", styles["SectionHeading"]))
-
-comparison_data = [["Model", "Accuracy", "Macro F1", "Training time"]]
-
-for _, row in comparison.iterrows():
-    comparison_data.append([
-        str(row["Model"]),
-        f'{row["Accuracy"]:.2%}',
-        f'{row["Macro F1"]:.2%}',
-        f'{row["Training Time (seconds)"]:.2f} sec'
-    ])
-
-story.append(make_table(
-    comparison_data,
-    [2.0 * inch, 1.1 * inch, 1.1 * inch, 1.5 * inch]
-))
-
-add_paragraph(
-    story,
-    "Extra Trees achieved the highest initial comparison accuracy "
-    "of 85.65%, followed closely by Random Forest and "
-    "Hist Gradient Boosting."
-)
-
-add_chart(story, "model_accuracy_comparison.png")
-
-add_paragraph(
-    story,
-    "The model accuracy comparison chart shows the performance "
-    "of the four machine learning algorithms. Extra Trees achieved "
-    "the highest initial accuracy of 85.65%, followed closely by "
-    "Random Forest at 85.42% and Hist Gradient Boosting at 85.22%. "
-    "Decision Tree achieved 79.17% accuracy."
-)
-
-# 5. Hyperparameter Tuning and Final Evaluation
-story.append(Paragraph(
-    "5. Hyperparameter Tuning and Final Evaluation",
-    styles["SectionHeading"]
-))
-
-metric_values = {
-    row["Metric"]: float(row["Score"])
-    for _, row in metrics.iterrows()
-}
-
-evaluation_data = [
-    ["Evaluation Metric", "Result"],
-    ["Final Test Accuracy", f'{metric_values["Test Accuracy"]:.2%}'],
-    ["Cross-Validation Accuracy",
-     f'{metric_values["Cross-Validation Accuracy"]:.2%}']
-]
-
-story.append(make_table(
-    evaluation_data,
-    [3.2 * inch, 2.0 * inch]
-))
-
-add_paragraph(
-    story,
-    "Extra Trees was tuned using RandomizedSearchCV with "
-    "three-fold stratified cross-validation. The best cross-validation "
-    "accuracy was approximately 83.78%. The final test accuracy "
-    "was approximately 84.85%."
-)
-
-# 5. Classification report
-story.append(Paragraph(
-    "6. Classification Performance",
-    styles["SectionHeading"]
-))
-
-class_names = {
-    "1": "Spruce/Fir",
-    "2": "Lodgepole Pine",
-    "3": "Ponderosa Pine",
-    "4": "Cottonwood/Willow",
-    "5": "Aspen",
-    "6": "Douglas-fir",
-    "7": "Krummholz"
-}
-
-class_data = [[
-    "Cover Type", "Precision", "Recall", "F1-score", "Support"
-]]
-
-for label, name in class_names.items():
-    row = classification.loc[str(label)]
-    class_data.append([
-        f"{label} - {name}",
-        f'{row["precision"]:.2%}',
-        f'{row["recall"]:.2%}',
-        f'{row["f1-score"]:.2%}',
-        str(int(row["support"]))
-    ])
-
-story.append(make_table(
-    class_data,
-    [2.0 * inch, 1.0 * inch, 1.0 * inch, 1.0 * inch, 0.8 * inch]
-))
-
-add_paragraph(
-    story,
-    "The overall macro F1-score and weighted F1-score were both "
-    f'{classification.loc["macro avg", "f1-score"]:.2%} and '
-    f'{classification.loc["weighted avg", "f1-score"]:.2%}, respectively. '
-    "Lodgepole Pine had the lowest recall among the seven classes."
-)
-
-
-# Classification Metrics Comparison
-
-add_chart(story, "classification_metrics_comparison.png")
-
-add_paragraph(
-    story,
-    "The classification metrics chart compares precision, recall "
-    "and F1-score for each forest cover type. Classes 4 and 7 "
-    "achieved particularly strong F1-scores, while Class 2 "
-    "(Lodgepole Pine) had the lowest F1-score. This indicates "
-    "that identifying Lodgepole Pine remains an area for improvement."
-)
-
-# 7. Confusion matrix
-story.append(Paragraph("7. Confusion Matrix", styles["SectionHeading"]))
-
-confusion_image = CHARTS / "confusion_matrix.png"
-if confusion_image.exists():
-    story.append(Image(str(confusion_image), width=6.2 * inch, height=4.2 * inch))
-    story.append(Spacer(1, 8))
-
-# 8. Feature Importance
-story.append(Paragraph("8. Feature Importance", styles["SectionHeading"]))
-
-top_features = features.head(15)
-feature_data = [["Feature", "Importance"]]
-
-for _, row in top_features.iterrows():
-    feature_data.append([
-        str(row["Feature"]),
-        f'{row["Importance"]:.4f}'
-    ])
-
-story.append(make_table(
-    feature_data,
-    [3.5 * inch, 1.5 * inch]
-))
-
-add_paragraph(
-    story,
-    "Elevation was the most influential feature in the trained "
-    "Extra Trees model, with an importance score of approximately "
-    "0.1684. Other influential variables included wilderness area "
-    "and horizontal distances to roads, fire points and hydrology."
-)
-
-importance_image = CHARTS / "feature_importance.png"
-if importance_image.exists():
-    story.append(Image(
-        str(importance_image),
-        width=6.2 * inch,
-        height=4.0 * inch
-    ))
-
-# 9. Limitations
-story.append(Paragraph("9. Limitations", styles["SectionHeading"]))
-add_paragraph(
-    story,
-    "The initial model comparison used the test split to compare "
-    "candidate models. The tuned Extra Trees model was subsequently "
-    "evaluated on that same test split. Therefore, the final test "
-    "accuracy is not a fully independent estimate of generalisation "
-    "performance and may be affected by model-selection bias. "
-    "A separate untouched holdout dataset is recommended for a "
-    "more rigorous final evaluation."
-)
-
-# 9. Conclusion
-story.append(Paragraph("10. Conclusion and Future Improvements",
-                       styles["SectionHeading"]))
-add_paragraph(
-    story,
-    "The project successfully developed an Extra Trees classifier "
-    "for seven forest cover classes, achieving 84.85% test accuracy. "
-    "Future work could focus on improving recall for Lodgepole Pine, "
-    "using an independent holdout dataset, testing additional models "
-    "and evaluating the model on a larger dataset."
-)
-
-doc = SimpleDocTemplate(
-    str(output_file),
-    pagesize=A4,
-    rightMargin=0.6 * inch,
-    leftMargin=0.6 * inch,
-    topMargin=0.65 * inch,
-    bottomMargin=0.7 * inch
-)
-
-doc.build(story, onFirstPage=footer, onLaterPages=footer)
-
-print("PDF report created successfully!")
-print("Location:", output_file)
-print("File size:", f"{output_file.stat().st_size:,} bytes")
+out=R/"Forest_Cover_Prediction_Final_Report.pdf"
+SimpleDocTemplate(str(out),pagesize=A4,rightMargin=1.7*cm,leftMargin=1.7*cm,topMargin=1.6*cm,bottomMargin=1.6*cm).build(story,onFirstPage=footer,onLaterPages=footer)
+print("PDF CREATED:",out)
+print("FILE SIZE:",out.stat().st_size,"bytes")

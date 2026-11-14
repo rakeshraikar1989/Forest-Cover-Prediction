@@ -5,3 +5,9 @@ __pycache__/
 .env
 data/*.csv
 models/*.joblib
+# Local backups and diagnostic artifacts
+Forest-Cover-Prediction_backup*/
+Evaluation_Report_PRCP-1005*.txt
+existing_pdf_extracted.txt
+project_diagnostic*.txt
+run_*_diagnostic.py

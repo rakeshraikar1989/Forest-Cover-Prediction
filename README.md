@@ -1,204 +1,78 @@
-\# Forest Cover Type Prediction
-
-
-
-\## Project Overview
-
-This project uses machine learning to predict forest cover types from cartographic and environmental features. The objective is to classify forest areas into one of seven cover types using the provided dataset.
-
-
-
-\## Project Details
-
-\- \*\*Project Code:\*\* PRCP-1005
-
-\- \*\*Project:\*\* Forest Cover Prediction
-
-\- \*\*Problem Type:\*\* Multiclass Classification
-
-\- \*\*Dataset Records:\*\* 15,120
-
-\- \*\*Input Features:\*\* 52
-
-\- \*\*Target Classes:\*\* 7
-
-
-
-\## Machine Learning Models
-
-The following models were evaluated:
-
-1\. Decision Tree
-
-2\. Random Forest
-
-3\. Extra Trees
-
-4\. Hist Gradient Boosting
-
-
-
-Extra Trees achieved the best initial comparison accuracy of 85.65%.
-
-
-
-Hyperparameter tuning was performed using RandomizedSearchCV with 3-fold Stratified Cross-Validation.
-
-
-
-\## Final Tuned Model
-
-\- \*\*Algorithm:\*\* Extra Trees Classifier
-
-\- \*\*Cross-Validation Accuracy:\*\* 83.78%
-
-\- \*\*Final Test Accuracy:\*\* 84.85%
-
-
-
-\## Important Features
-
-The top features included:
-
-\- Elevation
-
-\- Wilderness\_Area4
-
-\- Horizontal\_Distance\_To\_Roadways
-
-\- Horizontal\_Distance\_To\_Fire\_Points
-
-\- Horizontal\_Distance\_To\_Hydrology
-
-
-
-\## Project Structure
-
-```text
-
-Forest-Cover-Prediction/
-
-├── data/
-
-├── documentation/
-
-├── models/
-
-├── notebooks/
-
-├── reports/
-
-│   └── charts/
-
-├── .gitignore
-
-├── README.md
-
-└── requirements.txt
-
-```
-
-
-
-\## Technologies Used
-
-\- Python
-
-\- Pandas
-
-\- NumPy
-
-\- Matplotlib
-
-\- Seaborn
-
-\- Scikit-learn
-
-\- Jupyter Notebook
-
-\- Joblib
-
-\- Git
-
-
-
-\## How to Run the Project
-
-
-
-1\. Clone or download this repository.
-
-2\. Create and activate a Python virtual environment.
-
-3\. Install dependencies:
-
-
-
-```bash
-
-pip install -r requirements.txt
-
-```
-
-
-
-4\. Place the dataset file `train.csv` inside the `data/` folder.
-
-5\. Open the notebook:
-
-
-
-```bash
-
-jupyter notebook
-
-```
-
-
-
-6\. Open `notebooks/PRCP\_1005\_Forest\_Cover\_Prediction.ipynb` and run the cells.
-
-
-
-\## Model File
-
-The trained model is saved at:
-
-
-
-`models/extra\_trees\_forest\_cover.joblib`
-
-
-
-\## Evaluation Reports
-
-The `reports/` folder contains:
-
-\- Model comparison
-
-\- Model metrics
-
-\- Classification report
-
-\- Feature importance
-
-\- Confusion matrix chart
-
-\- Feature importance chart
-
-
-
-\## Notes
-
-The dataset used in this project contains 15,120 records. The initial model comparison used the test split for exploratory comparison, and the tuned model was subsequently evaluated on that same test split. Therefore, the final test result should be interpreted with this model-selection limitation in mind.
-
-
-
-The dataset CSV files and trained model are excluded from Git tracking through `.gitignore`.
-
-
-
-\## Project Status
-
-Core model development, evaluation, tuning, and artifact generation are complete. Documentation and repository preparation are in progress.
-
+﻿# Forest Cover Type Prediction
+
+## Project Overview
+This project uses machine learning classification to predict forest cover types from cartographic and environmental features.
+
+## Dataset
+- Records: 15,120
+- Original columns: 56
+- Target classes: 7
+- Records per class: 2,160
+- Missing values: 0
+- Duplicate rows: 0
+- Constant columns: Soil_Type7 and Soil_Type15
+- Predictors retained: 52
+
+## Data Preparation
+The identifier column was excluded because it does not represent an environmental predictor. Two constant soil indicator columns were removed because they contain no variation.
+
+No imputation was required because the dataset had no missing values. Soil and wilderness indicators were already encoded as binary features. Scaling was not applied because the selected tree-based algorithms do not require feature scaling.
+
+## Exploratory Data Analysis
+The analysis includes:
+- Target class distribution
+- Binary indicator frequency analysis
+- Numerical feature distributions and skewness
+- Outlier summaries using the IQR method
+- Feature correlation analysis
+- Feature relationships with forest cover classes
+- Elevation comparisons across classes
+
+Potential outliers were retained because extreme environmental measurements may represent valid geographical conditions.
+
+## Models and Validation
+Four classifiers were compared:
+- Decision Tree
+- Random Forest
+- Extra Trees
+- HistGradientBoosting
+
+Repeated stratified 3-fold cross-validation, repeated twice, was used to compare accuracy, macro F1 and balanced accuracy.
+
+Extra Trees achieved the highest mean cross-validation macro F1.
+
+## Final Model Results
+The tuned Extra Trees model achieved the following holdout results:
+
+| Metric | Result |
+|---|---:|
+| Accuracy | 87.57% |
+| Macro F1 | 87.43% |
+| Weighted F1 | 87.43% |
+| Balanced Accuracy | 87.57% |
+
+The lowest class recall was for Cover Type 2 at 71.99%.
+
+## Feature Interpretation
+Both impurity-based and permutation feature importance were examined. Elevation was the most influential feature in both analyses. Feature importance describes model behaviour and does not establish causation.
+
+## Project Outputs
+- Jupyter notebook: `notebooks/PRCP_1005_Forest_Cover_Prediction.ipynb`
+- Final PDF report: `reports/Forest_Cover_Prediction_Final_Report.pdf`
+- Analysis charts: `reports/charts/`
+- Evaluation results: `reports/`
+- Report generator: `generate_report.py`
+
+The trained model and feature schema are saved under `models/` but are excluded from Git because of their size.
+
+## Limitations
+The dataset was used in earlier project iterations. Therefore, the revised holdout is not historically untouched. Cross-validation and holdout results are internal estimates, not independent geographic validation. Performance may differ on data from other regions or collection conditions.
+
+## Future Work
+- Validate using an independently collected dataset.
+- Investigate frequent class-confusion pairs.
+- Evaluate additional algorithms and justified feature engineering.
+- Test generalisation across different geographic regions.
+
+## Technology
+Python, Pandas, NumPy, Matplotlib, Seaborn, Scikit-learn, Jupyter Notebook and ReportLab.

@@ -1,226 +1,162 @@
-\# Project Documentation – Forest Cover Type Prediction
+﻿# Project Documentation – Forest Cover Type Prediction
 
+## 1. Introduction
+This project develops a machine learning classification solution to predict forest cover types using cartographic and environmental measurements.
 
+The dataset contains 15,120 records, 56 original columns and seven forest cover classes.
 
-\## 1. Introduction
+## 2. Problem Statement
+The objective is to predict the correct forest cover class from geographical and environmental features. This is a seven-class classification problem.
 
-The purpose of this project is to build a machine learning classification model that predicts forest cover types using environmental and cartographic information.
+## 3. Dataset Understanding and Quality Checks
+The dataset was examined for:
+- Number of records and columns
+- Data types
+- Missing values
+- Duplicate records
+- Constant columns
+- Target class distribution
 
+The dataset contains 15,120 records and 56 columns. All columns are integer-valued. No missing values or duplicate rows were found.
 
+Each of the seven target classes contains 2,160 records. The target is therefore perfectly balanced in this dataset.
 
-The project uses a dataset containing 15,120 records and seven forest cover classes.
+Soil_Type7 and Soil_Type15 contain only zero values and were removed because they provide no predictive variation.
 
+## 4. Exploratory Data Analysis
+The exploratory analysis includes:
+- Target class distribution
+- Frequency of wilderness and soil indicator features
+- Numerical feature descriptive statistics and distributions
+- Skewness analysis
+- IQR-based outlier summaries
+- Correlation analysis
+- Feature relationships with target classes
+- Elevation distribution by cover type
 
+The analysis was used to understand the data structure, identify redundant features and examine how environmental measurements vary across cover types.
 
-\## 2. Problem Statement
+Potential outliers were retained. Tree-based models can handle different feature scales, and extreme environmental measurements may represent valid observations rather than errors.
 
-Forest cover classification helps understand the distribution of different forest types based on geographical and environmental conditions.
+## 5. Data Preprocessing
+The identifier column Id was excluded because it is not an environmental predictor.
 
+Soil_Type7 and Soil_Type15 were removed because both are constant.
 
+The final modelling dataset contains 52 predictors and the target variable Cover_Type.
 
-This project develops a machine learning solution to predict the correct forest cover class from the available input features.
+Preprocessing decisions:
+- Missing-value imputation was unnecessary because no missing values were present.
+- Encoding was unnecessary because categorical indicators were already represented as binary columns.
+- Feature scaling was not applied because the selected algorithms are tree-based and do not require scaling.
+- Stratified sampling was used to preserve class proportions.
 
+The final model is saved as a Scikit-learn pipeline.
 
+## 6. Baseline and Model Comparison
+A DummyClassifier was used as a baseline.
 
-\## 3. Dataset Description
+The following classifiers were evaluated:
+1. Decision Tree
+2. Random Forest
+3. Extra Trees
+4. HistGradientBoosting
 
-\- Total records: 15,120
+RepeatedStratifiedKFold was used with three folds and two repeats.
 
-\- Total original columns: 56
+Models were compared using:
+- Accuracy
+- Macro F1
+- Balanced accuracy
+- Mean and standard deviation across validation runs
+- Total cross-validation runtime
 
-\- Input features used: 52
+Extra Trees achieved the highest mean cross-validation macro F1 of 0.8554, with a standard deviation of 0.0038.
 
-\- Target variable: Cover\_Type
+Random Forest achieved a mean macro F1 of 0.8536. HistGradientBoosting achieved 0.8454, while Decision Tree achieved 0.7760.
 
-\- Number of classes: 7
+## 7. Hyperparameter Tuning
+RandomizedSearchCV was applied to the Extra Trees model.
 
-\- Missing values: 0
+The search used stratified three-fold cross-validation and macro F1 as the scoring metric. This scoring choice evaluates performance across all classes rather than relying only on overall accuracy.
 
-\- Duplicate records: 0
+The selected tuned model was evaluated on the stratified holdout set.
 
+## 8. Final Holdout Evaluation
+The tuned Extra Trees model achieved:
 
-
-The `Id` column and two constant columns (`Soil\_Type7` and `Soil\_Type15`) were excluded from model training.
-
-
-
-\## 4. Data Preparation
-
-The following activities were completed:
-
-\- Loaded the dataset using Pandas.
-
-\- Checked missing values and duplicate records.
-
-\- Examined target class distribution.
-
-\- Identified constant columns.
-
-\- Validated Wilderness Area and Soil Type indicator columns.
-
-\- Separated input features and target variable.
-
-\- Split the dataset into training and testing sets using an 80:20 ratio.
-
-\- Used stratification to preserve class distribution.
-
-
-
-Training records: 12,096  
-
-Testing records: 3,024
-
-
-
-\## 5. Exploratory Data Analysis
-
-The target variable contains seven classes, with 2,160 records in each class.
-
-
-
-A class distribution chart was generated to examine the balance of the dataset.
-
-
-
-\## 6. Models Evaluated
-
-
-
-| Model | Accuracy |
-
+| Metric | Result |
 |---|---:|
+| Accuracy | 87.57% |
+| Macro F1 | 87.43% |
+| Weighted F1 | 87.43% |
+| Balanced Accuracy | 87.57% |
 
-| Extra Trees | 85.65% |
+The holdout set contains 3,024 records, with 432 records per class.
 
-| Random Forest | 85.42% |
+Class-level recall:
+- Cover Type 1: 80.79%
+- Cover Type 2: 71.99%
+- Cover Type 3: 83.10%
+- Cover Type 4: 97.22%
+- Cover Type 5: 96.06%
+- Cover Type 6: 87.96%
+- Cover Type 7: 95.83%
 
-| Hist Gradient Boosting | 85.22% |
+Cover Type 2 had the lowest recall and deserves further investigation.
 
-| Decision Tree | 79.17% |
+## 9. Error Analysis
+The classification report and confusion matrix were used to examine model performance by class.
 
+The analysis includes class-level precision, recall and F1 scores, as well as the most frequent class-confusion pairs.
 
+This helps identify classes that the model finds difficult to distinguish.
 
-Extra Trees achieved the highest initial comparison accuracy.
+## 10. Feature Importance
+Two feature-importance methods were examined:
+- Impurity-based feature importance from Extra Trees
+- Permutation importance evaluated on the holdout features using macro F1
 
+Elevation ranked as the most influential feature in both analyses.
 
+Feature importance indicates how the fitted model uses available information. It does not establish that a feature causes a particular forest cover type.
 
-\## 7. Hyperparameter Tuning
+## 11. Saved Outputs
+The project generates:
+- Executed Jupyter notebook
+- Final PDF report
+- Exploratory analysis charts
+- Cross-validation comparison results
+- Hyperparameter tuning results
+- Holdout evaluation metrics
+- Classification report
+- Confusion matrix
+- Class error analysis
+- Impurity and permutation feature importance
+- Saved model pipeline and feature schema
 
-RandomizedSearchCV was used to tune the Extra Trees classifier.
+## 12. Limitations
+The dataset was used in earlier project iterations. The revised holdout set must therefore not be described as historically untouched.
 
+Cross-validation and holdout results are internal estimates based on this dataset. They do not replace evaluation on an independently collected dataset or geographic region.
 
+The dataset contains 15,120 records and may not represent all forest environments or collection conditions.
 
-Three-fold Stratified Cross-Validation was applied.
+Feature importance is not evidence of causation.
 
+## 13. Conclusion
+The project developed and evaluated a seven-class forest cover prediction model.
 
+Extra Trees achieved the strongest mean cross-validation macro F1 among the compared default candidates. After hyperparameter tuning, the final model achieved 87.57% holdout accuracy and 87.43% holdout macro F1.
 
-Selected parameters:
+The model performed particularly well for Cover Types 4, 5 and 7. Cover Type 2 had the lowest recall at 71.99%, making it an important area for further analysis.
 
-\- Number of estimators: 100
+The results demonstrate useful predictive performance on the available dataset, while independent geographic validation remains necessary before real-world deployment.
 
-\- Maximum depth: 30
-
-\- Minimum samples split: 5
-
-\- Minimum samples leaf: 1
-
-\- Maximum features: sqrt
-
-
-
-Best cross-validation accuracy: 83.78%.
-
-
-
-\## 8. Final Model Evaluation
-
-The tuned Extra Trees model achieved a test accuracy of 84.85%.
-
-
-
-The classification report showed:
-
-\- Macro F1-score: approximately 0.85
-
-\- Weighted F1-score: approximately 0.85
-
-
-
-Class 7 achieved the highest F1-score of 0.96, while Class 2 was the most challenging, with an F1-score of 0.70.
-
-
-
-A confusion matrix was generated to examine classification performance across all seven classes.
-
-
-
-\## 9. Feature Importance
-
-The most influential features were:
-
-1\. Elevation
-
-2\. Wilderness\_Area4
-
-3\. Horizontal\_Distance\_To\_Roadways
-
-4\. Horizontal\_Distance\_To\_Fire\_Points
-
-5\. Horizontal\_Distance\_To\_Hydrology
-
-
-
-Elevation had the highest feature importance score.
-
-
-
-\## 10. Saved Project Artifacts
-
-\- Trained model: `models/extra\_trees\_forest\_cover.joblib`
-
-\- Model comparison: `reports/model\_comparison.csv`
-
-\- Model metrics: `reports/model\_metrics.csv`
-
-\- Classification report: `reports/classification\_report.csv`
-
-\- Feature importance: `reports/feature\_importance.csv`
-
-\- Confusion matrix: `reports/charts/confusion\_matrix.png`
-
-\- Feature importance chart: `reports/charts/feature\_importance.png`
-
-
-
-\## 11. Conclusion
-
-The project successfully developed a seven-class forest cover classification model using the Extra Trees algorithm.
-
-
-
-The tuned model achieved 84.85% test accuracy. Elevation was identified as the most influential feature.
-
-
-
-The results demonstrate how machine learning can be applied to environmental and geographical classification problems.
-
-
-
-\## 12. Evaluation Limitation
-
-The initial model comparison used the test split to compare algorithms. The tuned model was subsequently evaluated on the same test split. Therefore, the final test accuracy is not a completely independent estimate of generalisation performance. A future evaluation should reserve a fresh untouched test set or use nested cross-validation.
-
-
-
-\## 13. Future Improvements
-
-\- Evaluate additional classification algorithms.
-
-\- Perform more extensive hyperparameter tuning.
-
-\- Use a fully independent test dataset.
-
-\- Build a simple web application for predictions.
-
-\- Explore deployment through a REST API.
-
+## 14. Future Work
+- Evaluate the model on independently collected data.
+- Investigate confusion between Cover Type 2 and other classes.
+- Compare additional classification algorithms.
+- Explore justified feature engineering.
+- Evaluate model generalisation across geographic regions.
+- Consider a deployment interface after further validation.
